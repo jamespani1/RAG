@@ -4,8 +4,6 @@ from langchain_groq import ChatGroq
 from langchain_community.vectorstores import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnablePassthrough
-from langchain_core.output_parsers import StrOutputParser
 
 from core.config import (
     VECTOR_STORE_DIRECTORY, 
@@ -110,17 +108,19 @@ def query_rag(query: str, file_name: str) -> str:
             search_kwargs={"filter": {"source": file_name}}
         )
 
-        rag_chain = (
-            {"context": retriever | format_docs, "question": RunnablePassthrough()}
-            | rag_prompt
-            | llm
-            | StrOutputParser()
+        docs = retriever.invoke(query)
+
+        context = format_docs(docs)
+
+        prompt_text = rag_prompt.format(
+            context=context,
+            question=query
         )
-        
-        logger.info(f"Invoking RAG chain for file '{file_name}' with query: '{query}'")
-        
-        answer = rag_chain.invoke(query)
-        
+
+        response = llm.invoke(prompt_text)
+
+        answer = response.content
+
         return answer
 
     except Exception as e:
